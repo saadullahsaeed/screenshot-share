@@ -1,3 +1,5 @@
 key: 'XXX'
 imgur_session: 'XXX'
 listen_to_dir: 'XXX'
+oauth_token: 'XXXX'
+oauth_token_secret: 'XXX'

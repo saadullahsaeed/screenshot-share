@@ -2,11 +2,10 @@
 
 require 'rubygems'
 require 'fssm'
-require 'json'
-require 'curb'
 require 'crack/json'
 require 'ruby-growl'
 require 'yaml'
+require 'oauth'
 
 
 def log(text)
@@ -23,7 +22,7 @@ end
 
 def notify_growl(file, url)
   
-  system "growl -H 127.0.0.1 -m \"File: #{file} has been uploaded to: #{url}\" --sticky"
+  system "growl -H 127.0.0.1 -t \"Screenshot Uploaded\" -m \"File: #{file} has been uploaded to: #{url}\" --sticky"
 end
 
 
@@ -35,24 +34,25 @@ def upload_to_imgur(base, file)
   
   begin
 
-    c = Curl::Easy.new("http://imgur.com/api/upload.json")
-    c.multipart_form_post = true
+    request_params = {
+      :key => $config['key'],
+      :image => Base64.encode64(File.read file_path),
+      :type => 'base64'
+    }
     
-    if $config['imgur_session'] then
-      c.cookies = "IMGURSESSION="+$config['imgur_session']
-    end
-    
-    c.http_post(Curl::PostField.content('key', $config['key']), Curl::PostField.file('image', file_path))
-    response = Crack::JSON.parse c.body_str
-    image_url = response["rsp"]["image"]["original_image"]
-    
+    response = $consumer.request(:post, '/account/images.json', $access_token, {}, request_params)
+    #puts response.body
+    result = Crack::JSON.parse response.body
+
+    image_url = result["images"]["links"]["original"]
     log "Image Uploaded to: #{image_url}"
-    copy_to_clipboard image_url
     
+    copy_to_clipboard image_url
     notify_growl file, image_url
     
   rescue Exception => exception
-    puts test_exception.message
+    
+    puts exception.message
   end
   
 end
@@ -62,6 +62,9 @@ config_file = ARGV[0]
 if not config_file then abort "Usage: main.rb /path/to/config.yaml" end
 
 $config = YAML.load(File.read(config_file))
+
+$consumer=OAuth::Consumer.new($config['consumer_key'], $config['consumer_secret'], {:site=>"https://api.imgur.com/2"})
+$access_token = OAuth::AccessToken.from_hash($consumer, {:oauth_token=>$config['oauth_token'], :oauth_token_secret => $config['oauth_token_secret']})
 
 puts "Listening now"
 FSSM.monitor($config['listen_to_dir'], ['**/*.png']) do
