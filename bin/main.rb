@@ -3,6 +3,7 @@
 require 'rubygems'
 require 'fssm'
 require 'crack/json'
+require 'curb'
 require 'ruby-growl'
 require 'yaml'
 require 'oauth'
@@ -31,11 +32,29 @@ def notify_growl_of_error
 end
 
 
-def upload_to_imgur(base, file)
-  
-  file_path = "#{base}/#{file}"
-  
-  log "Attempting to upload #{file_path}"
+
+def upload_anonymous(file_path)
+  puts "Uploading anonymous"
+  begin
+      
+      c = Curl::Easy.new("http://imgur.com/api/upload.json")
+      c.multipart_form_post = true
+
+      c.http_post(Curl::PostField.content('key', $config['key']), Curl::PostField.file('image', file_path))
+      response = Crack::JSON.parse c.body_str
+      image_url = response["rsp"]["image"]["original_image"]
+      
+   rescue Exception => exception
+
+     log exception.message
+   end
+
+   image_url
+end
+
+
+
+def upload_using_oauth(file_path)
   
   begin
 
@@ -49,20 +68,34 @@ def upload_to_imgur(base, file)
     result = Crack::JSON.parse response.body
 
     image_url = result["images"]["links"]["original"]
-    log "Image Uploaded to: #{image_url}"
-    
-    if not image_url
-      notify_growl_of_error
-      return
-    end
-    
-    copy_to_clipboard image_url
-    notify_growl file, image_url
     
   rescue Exception => exception
     
-    puts exception.message
+    log exception.message
   end
+  
+  image_url
+end
+
+
+
+def upload_to_imgur(base, file)
+  
+  file_path = "#{base}/#{file}"
+  
+  if $config['anonymous']
+    image_url = upload_anonymous file_path
+  else
+    image_url = upload_using_oauth file_path  
+  end
+  
+  if not image_url
+    notify_growl_of_error
+    return
+  end
+  
+  copy_to_clipboard image_url
+  notify_growl file, image_url
   
 end
 
@@ -72,10 +105,12 @@ if not config_file then abort "Usage: main.rb /path/to/config.yaml" end
 
 $config = YAML.load(File.read(config_file))
 
-$consumer=OAuth::Consumer.new($config['consumer_key'], $config['consumer_secret'], {:site=>"https://api.imgur.com/2"})
-$access_token = OAuth::AccessToken.from_hash($consumer, {:oauth_token=>$config['oauth_token'], :oauth_token_secret => $config['oauth_token_secret']})
+#
+if not $config['anonymous']
+  $consumer = OAuth::Consumer.new($config['consumer_key'], $config['consumer_secret'], {:site=>"https://api.imgur.com/2"})
+  $access_token = OAuth::AccessToken.from_hash($consumer, {:oauth_token=>$config['oauth_token'], :oauth_token_secret => $config['oauth_token_secret']})
+end
 
-puts "Listening now"
 FSSM.monitor($config['listen_to_dir'], ['**/*.png']) do
   create { |base, relative, type| upload_to_imgur base, relative }
 end
