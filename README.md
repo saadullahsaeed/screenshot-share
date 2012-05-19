@@ -26,3 +26,16 @@ Usage
 =====
 
 ruby control.rb start -- /path/to/config.yaml
+
+
+Anonymous vs OAuth
+==================
+
+To use the 'Anonymous' mode, set the property anonymous: 1 in the config.
+
+To use OAuth, get the access token and add it to the config as indicated in the sample config.
+
+
+Email: saadullah.saeed@gmail.com
+
+
