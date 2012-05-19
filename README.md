@@ -20,3 +20,9 @@ Added Support OAuth
 ===================
 
 You will need to get the access token and plug into the config in order to use OAuth. I need to add a mode config, to be able to use this with the anonymous IMGUR API
+
+
+Usage
+=====
+
+ruby control.rb start -- /path/to/config.yaml
