@@ -7,10 +7,9 @@ require 'ruby-growl'
 require 'yaml'
 require 'oauth'
 
-
 def log(text)
   
-  puts "#{text}"
+  #puts "#{text}"
 end
 
 
@@ -23,6 +22,12 @@ end
 def notify_growl(file, url)
   
   system "growl -H 127.0.0.1 -t \"Screenshot Uploaded\" -m \"File: #{file} has been uploaded to: #{url}\" --sticky"
+end
+
+
+def notify_growl_of_error
+  
+  system "growl -H 127.0.0.1 -t \"Error Uploading Screenshot\" -m \"Bummer :( Try again, maybe?\" --sticky"
 end
 
 
@@ -41,11 +46,15 @@ def upload_to_imgur(base, file)
     }
     
     response = $consumer.request(:post, '/account/images.json', $access_token, {}, request_params)
-    #puts response.body
     result = Crack::JSON.parse response.body
 
     image_url = result["images"]["links"]["original"]
     log "Image Uploaded to: #{image_url}"
+    
+    if not image_url
+      notify_growl_of_error
+      return
+    end
     
     copy_to_clipboard image_url
     notify_growl file, image_url
